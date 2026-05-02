@@ -30,11 +30,6 @@ CurrentUpdateUser = Annotated[object, Depends(require_permission("inventory.upda
 CurrentAdjustUser = Annotated[object, Depends(require_permission("inventory.adjust"))]
 
 
-@router.get("/health")
-def health():
-    return {"status": "ok"}
-
-
 @router.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product_api(data: ProductCreate, db: DbSession, current_user: CurrentCreateUser):
     return create_product(db, data, current_user.org_id, current_user.user_id)

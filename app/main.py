@@ -12,7 +12,7 @@ from app.exceptions.handlers import (
     http_exception_handler,
     validation_exception_handler,
 )
-from app.routers.v1 import inventory
+from app.routers.v1 import health, inventory
 
 setup_logging()
 
@@ -37,4 +37,5 @@ app.add_exception_handler(AppException, app_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
+app.include_router(health.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
