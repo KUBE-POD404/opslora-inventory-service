@@ -7,15 +7,22 @@ from app.database import get_db
 from app.dependencies.permissions import require_permission
 from app.schemas import (
     ProductCreate,
+    ProductOrderSnapshot,
     ProductResponse,
     ProductUpdate,
     StockAdjustment,
     StockBalanceResponse,
+    StockCheckRequest,
+    StockCheckResponse,
+    StockDeductRequest,
 )
 from app.services.inventory_service import (
     adjust_stock,
+    check_stock_availability,
     create_product,
+    deduct_stock_for_order,
     get_product,
+    get_product_order_snapshot,
     get_stock_balance,
     list_products,
     update_product,
@@ -50,6 +57,11 @@ def get_product_api(product_id: int, db: DbSession, current_user: CurrentReadUse
     return get_product(db, product_id, current_user.org_id)
 
 
+@router.get("/products/{product_id}/order-snapshot", response_model=ProductOrderSnapshot)
+def get_product_order_snapshot_api(product_id: int, db: DbSession, current_user: CurrentReadUser):
+    return get_product_order_snapshot(db, product_id, current_user.org_id)
+
+
 @router.put("/products/{product_id}", response_model=ProductResponse)
 def update_product_api(
     product_id: int,
@@ -68,3 +80,13 @@ def get_stock_api(product_id: int, db: DbSession, current_user: CurrentReadUser)
 @router.post("/stock/adjust", response_model=StockBalanceResponse)
 def adjust_stock_api(data: StockAdjustment, db: DbSession, current_user: CurrentAdjustUser):
     return adjust_stock(db, data, current_user.org_id, current_user.user_id)
+
+
+@router.post("/stock/check", response_model=StockCheckResponse)
+def check_stock_api(data: StockCheckRequest, db: DbSession, current_user: CurrentReadUser):
+    return check_stock_availability(db, data, current_user.org_id)
+
+
+@router.post("/stock/deduct", response_model=list[StockBalanceResponse])
+def deduct_stock_api(data: StockDeductRequest, db: DbSession, current_user: CurrentAdjustUser):
+    return deduct_stock_for_order(db, data, current_user.org_id, current_user.user_id)

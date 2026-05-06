@@ -40,6 +40,20 @@ class ProductResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProductOrderSnapshot(BaseModel):
+    id: int
+    name: str
+    sku: str
+    description: str | None
+    hsn_sac_code: str | None
+    unit_of_measure: str
+    sale_price: Decimal
+    tax_rate: Decimal
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class StockAdjustment(BaseModel):
     product_id: int
     quantity: Decimal
@@ -47,6 +61,32 @@ class StockAdjustment(BaseModel):
     reason: str | None = Field(default=None, max_length=255)
     reference_type: str | None = Field(default=None, max_length=50)
     reference_id: int | None = None
+
+
+class StockCheckItem(BaseModel):
+    product_id: int
+    quantity: Decimal = Field(..., gt=0)
+
+
+class StockCheckRequest(BaseModel):
+    items: list[StockCheckItem]
+
+
+class StockCheckItemResponse(BaseModel):
+    product_id: int
+    requested_quantity: Decimal
+    quantity_on_hand: Decimal
+    available: bool
+
+
+class StockCheckResponse(BaseModel):
+    all_available: bool
+    items: list[StockCheckItemResponse]
+
+
+class StockDeductRequest(StockCheckRequest):
+    reference_type: str = Field(..., max_length=50)
+    reference_id: int
 
 
 class StockBalanceResponse(BaseModel):

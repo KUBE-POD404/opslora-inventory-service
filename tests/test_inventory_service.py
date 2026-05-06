@@ -4,8 +4,16 @@ import pytest
 
 from app.exceptions.custom_exceptions import ConflictException, NotFoundException
 from app.models.stock import StockMovement
-from app.schemas import ProductCreate, StockAdjustment
-from app.services.inventory_service import adjust_stock, create_product, get_product, get_stock_balance
+from app.schemas import ProductCreate, StockAdjustment, StockCheckRequest, StockDeductRequest
+from app.services.inventory_service import (
+    adjust_stock,
+    check_stock_availability,
+    create_product,
+    deduct_stock_for_order,
+    get_product,
+    get_product_order_snapshot,
+    get_stock_balance,
+)
 
 
 def product_payload(sku="SKU-1"):
@@ -82,3 +90,59 @@ def test_product_reads_are_tenant_scoped(db_session):
     assert get_product(db_session, product.id, organization_id=1).id == product.id
     with pytest.raises(NotFoundException):
         get_product(db_session, product.id, organization_id=2)
+
+
+def test_product_order_snapshot_rejects_inactive_products(db_session):
+    product = create_product(db_session, product_payload(), organization_id=1, created_by_user_id=10)
+    assert get_product_order_snapshot(db_session, product.id, 1).id == product.id
+
+    product.is_active = False
+    db_session.commit()
+
+    with pytest.raises(ConflictException):
+        get_product_order_snapshot(db_session, product.id, 1)
+
+
+def test_stock_check_and_order_deduction_are_atomic(db_session):
+    product = create_product(db_session, product_payload(), organization_id=1, created_by_user_id=10)
+    adjust_stock(
+        db_session,
+        StockAdjustment(product_id=product.id, quantity=Decimal("10"), movement_type="IN"),
+        organization_id=1,
+        created_by_user_id=10,
+    )
+
+    check = check_stock_availability(
+        db_session,
+        StockCheckRequest(items=[{"product_id": product.id, "quantity": Decimal("4")}]),
+        organization_id=1,
+    )
+    assert check.all_available is True
+
+    balances = deduct_stock_for_order(
+        db_session,
+        StockDeductRequest(
+            reference_type="ORDER",
+            reference_id=1001,
+            items=[{"product_id": product.id, "quantity": Decimal("4")}],
+        ),
+        organization_id=1,
+        created_by_user_id=10,
+    )
+
+    assert balances[0].quantity_on_hand == Decimal("6.00")
+    movement = db_session.query(StockMovement).order_by(StockMovement.id.desc()).first()
+    assert movement.reference_type == "ORDER"
+    assert movement.reference_id == 1001
+
+    with pytest.raises(ConflictException):
+        deduct_stock_for_order(
+            db_session,
+            StockDeductRequest(
+                reference_type="ORDER",
+                reference_id=1002,
+                items=[{"product_id": product.id, "quantity": Decimal("7")}],
+            ),
+            organization_id=1,
+            created_by_user_id=10,
+        )

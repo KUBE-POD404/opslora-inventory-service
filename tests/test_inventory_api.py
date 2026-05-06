@@ -68,6 +68,10 @@ def test_inventory_api_product_and_stock_workflow():
         assert stock_response.status_code == 200
         assert stock_response.json()["quantity_on_hand"] == "0.00"
 
+        snapshot_response = client.get(f"/api/v1/inventory/products/{product['id']}/order-snapshot")
+        assert snapshot_response.status_code == 200
+        assert snapshot_response.json()["sku"] == "BOLT-001"
+
         adjust_response = client.post(
             "/api/v1/inventory/stock/adjust",
             json={
@@ -79,6 +83,24 @@ def test_inventory_api_product_and_stock_workflow():
         )
         assert adjust_response.status_code == 200
         assert adjust_response.json()["quantity_on_hand"] == "25.00"
+
+        check_response = client.post(
+            "/api/v1/inventory/stock/check",
+            json={"items": [{"product_id": product["id"], "quantity": "3"}]},
+        )
+        assert check_response.status_code == 200
+        assert check_response.json()["all_available"] is True
+
+        deduct_response = client.post(
+            "/api/v1/inventory/stock/deduct",
+            json={
+                "reference_type": "ORDER",
+                "reference_id": 1001,
+                "items": [{"product_id": product["id"], "quantity": "3"}],
+            },
+        )
+        assert deduct_response.status_code == 200
+        assert deduct_response.json()[0]["quantity_on_hand"] == "22.00"
 
         list_response = client.get("/api/v1/inventory/products")
         assert list_response.status_code == 200
