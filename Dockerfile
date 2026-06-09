@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-FROM dhi.io/python:3.13-dev AS builder
+FROM python:3.13-slim AS builder
 WORKDIR /app
 RUN python -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip pip install --no-cache-dir -r requirements.txt
 
-FROM dhi.io/python:3.13.13 AS runtime
+FROM python:3.13-slim AS runtime
 WORKDIR /app
 ENV PATH="/app/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
