@@ -19,7 +19,7 @@ class Product(Base):
     tax_rate = Column(Numeric(5, 2), nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True)
     created_by_user_id = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),
