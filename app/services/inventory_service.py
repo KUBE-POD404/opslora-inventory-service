@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.exceptions.custom_exceptions import ConflictException, NotFoundException
 from app.models.product import Product
 from app.models.stock import StockBalance, StockMovement
+from app.schemas import StockCheckItemResponse, StockCheckResponse
 
 
 def create_product(db: Session, payload, organization_id: int, created_by_user_id: int):
@@ -61,6 +62,13 @@ def get_product(db: Session, product_id: int, organization_id: int):
     )
     if not product:
         raise NotFoundException("Product not found")
+    return product
+
+
+def get_product_order_snapshot(db: Session, product_id: int, organization_id: int):
+    product = get_product(db, product_id, organization_id)
+    if not product.is_active:
+        raise ConflictException("Product is inactive")
     return product
 
 
@@ -121,3 +129,56 @@ def adjust_stock(db: Session, payload, organization_id: int, created_by_user_id:
     db.commit()
     db.refresh(balance)
     return balance
+
+
+def check_stock_availability(db: Session, payload, organization_id: int):
+    results = []
+
+    for item in payload.items:
+        get_product_order_snapshot(db, item.product_id, organization_id)
+        balance = get_stock_balance(db, item.product_id, organization_id)
+        requested = Decimal(str(item.quantity))
+        results.append(
+            StockCheckItemResponse(
+                product_id=item.product_id,
+                requested_quantity=requested,
+                quantity_on_hand=balance.quantity_on_hand,
+                available=balance.quantity_on_hand >= requested,
+            )
+        )
+
+    return StockCheckResponse(
+        all_available=all(item.available for item in results),
+        items=results,
+    )
+
+
+def deduct_stock_for_order(db: Session, payload, organization_id: int, created_by_user_id: int):
+    availability = check_stock_availability(db, payload, organization_id)
+    if not availability.all_available:
+        raise ConflictException("Insufficient stock", details={"items": [item.model_dump() for item in availability.items]})
+
+    balances = []
+    for item in payload.items:
+        balance = get_stock_balance(db, item.product_id, organization_id)
+        quantity = Decimal(str(item.quantity))
+        balance.quantity_on_hand -= quantity
+        balance.updated_at = datetime.now(timezone.utc)
+        db.add(
+            StockMovement(
+                organization_id=organization_id,
+                product_id=item.product_id,
+                movement_type="OUT",
+                quantity=quantity,
+                reason="Order confirmed",
+                reference_type=payload.reference_type,
+                reference_id=payload.reference_id,
+                created_by_user_id=created_by_user_id,
+            )
+        )
+        balances.append(balance)
+
+    db.commit()
+    for balance in balances:
+        db.refresh(balance)
+    return balances

@@ -13,7 +13,7 @@ class StockBalance(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity_on_hand = Column(Numeric(12, 2), nullable=False, default=0)
     low_stock_threshold = Column(Numeric(12, 2), nullable=False, default=0)
-    updated_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("organization_id", "product_id", name="uq_stock_balances_org_product"),
@@ -32,4 +32,4 @@ class StockMovement(Base):
     reference_type = Column(String(50), nullable=True)
     reference_id = Column(Integer, nullable=True)
     created_by_user_id = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
