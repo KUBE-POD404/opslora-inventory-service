@@ -13,6 +13,8 @@ ENV PATH="/app/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 COPY --from=builder --chown=10001:10001 /app/venv /app/venv
 COPY --chown=10001:10001 app/ /app/app/
+COPY --chown=10001:10001 alembic.ini /app/alembic.ini
+COPY --chown=10001:10001 alembic/ /app/alembic/
 USER 10001
 EXPOSE 3000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000"]
